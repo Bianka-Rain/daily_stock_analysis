@@ -4,7 +4,7 @@
 
 > 本页未引入新的外部 provider、模型名或 Base URL 兼容行为，仅整理配置参考与官方来源；实际兼容性仍以仓库当前运行时依赖与测试结论为准。
 
-> - 运行时基础：`requirements.txt` 当前锁定 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`，兼容语义以该版本约束下实现为准。
+> - 运行时基础：`requirements.txt` 当前锁定 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<1.99.0`，兼容语义以该版本约束下实现为准。
 > - 验证闭环：系统配置链路回归见 `tests/test_system_config_service.py` 与 `tests/test_system_config_api.py`，`Web` 侧配置页交互回归见现有组件测试用例。
 > - 回退路径：保留旧变量不做自动迁移；可通过 Web/桌面导出备份后 `POST /api/v1/system/config/import` 回滚，或手动恢复历史 `LLM_*` / `LITELLM_*` / `AGENT_*` / `VISION_MODEL` 配置。
 
@@ -60,6 +60,22 @@ Phase 6a Tool Surface 是 AgentBackend 的唯一内部工具面：统一 DSA 工
 
 ## Channels 示例
 
+### Modelflare
+
+[注册 Modelflare](https://modelflare.dev/sign-up?utm_source=github&utm_campaign=daily_stock_analysis)，创建 API Key 后使用 OpenAI-compatible 渠道：
+
+```env
+MODELFLARE_KEY=sk-xxx
+```
+
+只需填写 `MODELFLARE_KEY`，后端自动启用 Modelflare，默认地址为 `https://modelflare.dev/v1`、模型为 `openai/gpt-6.1-sol`，无需填写渠道名、地址或模型。显式 YAML 或 `LLM_CHANNELS` 优先，Modelflare 显式渠道 Key 优先于此简写；清空 Key 或禁用渠道即可停用。推导不改写已保存配置。
+
+只声明 `modelflare` 一个渠道且未填渠道模型列表时，未配置主模型时默认使用 `openai/gpt-6.1-sol`；配置主模型后，后端复用 `LITELLM_MODEL` 和带 `openai/` 前缀的备用模型；主模型使用 `openai/<模型名>`。显式 `LLM_MODELFLARE_MODELS` 优先，多渠道仍需分别声明模型。推导不改写已保存配置或模型选择。
+
+渠道名为 `modelflare` 时，未填写或留空的接入地址自动使用 `https://modelflare.dev/v1`；显式 `LLM_MODELFLARE_BASE_URL` 优先。该地址默认识别为 `openai` 协议，接口默认为 `chat_completions`；未设置 `LITELLM_MODEL` 时使用首个渠道模型。默认模型仍需账号有访问权限，不自动补充 API Key。
+
+`gpt-6.1-sol` 是本项目的 Modelflare 默认模型；实际模型列表与可用性以账号权限、控制台和 Web 设置页「测试连接」结果为准。渠道模板仅决定新建配置的初始值，不会改写已保存的渠道、主模型或 fallback。
+
 ### DeepSeek 官方渠道
 
 ```env
@@ -106,8 +122,8 @@ LITELLM_FALLBACK_MODELS=openai/gpt-5.6-terra,openai/gpt-5.6-luna
 
 | 服务商 | 渠道名 | 协议 | Base URL | 模型示例 |
 | --- | --- | --- | --- | --- |
+| Modelflare | `modelflare` | `openai` | `https://modelflare.dev/v1` | `gpt-6.1-sol`（以账号可用模型为准） |
 | AIHubmix | `aihubmix` | `openai` | `https://aihubmix.com/v1` | `gpt-5.5,claude-sonnet-4-6,gemini-3.1-pro-preview` |
-| Anspire Open | `anspire` | `openai` | `https://open-gateway.anspire.cn/v6`（示例） | `Doubao-Seed-2.0-lite,Doubao-Seed-2.0-pro,qwen3.5-flash,MiniMax-M2.7`（示例） |
 | OpenAI | `openai` | `openai` | `https://api.openai.com/v1` | `gpt-5.5,gpt-5.4-mini` |
 | DeepSeek | `deepseek` | `deepseek` | `https://api.deepseek.com` | `deepseek-v4-flash,deepseek-v4-pro` |
 | Gemini | `gemini` | `gemini` | 留空 | `gemini-3.1-pro-preview,gemini-3-flash-preview` |
@@ -120,13 +136,15 @@ LITELLM_FALLBACK_MODELS=openai/gpt-5.6-terra,openai/gpt-5.6-luna
 | 火山方舟 / 豆包 | `volcengine` | `openai` | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-seed-1-6-251015,doubao-seed-1-6-thinking-251015` |
 | 硅基流动 / SiliconFlow | `siliconflow` | `openai` | `https://api.siliconflow.cn/v1` | `deepseek-ai/DeepSeek-V3.2,Qwen/Qwen3-235B-A22B-Thinking-2507` |
 | OpenRouter | `openrouter` | `openai` | `https://openrouter.ai/api/v1` | `~anthropic/claude-sonnet-latest,~openai/gpt-latest` |
+| Requesty | `requesty` | `openai` | `https://router.requesty.ai/v1`（EU：`https://router.eu.requesty.ai/v1`） | `claude-sonnet-4-6,gpt-5.4` |
+| Anspire Open（兼容） | `anspire` | `openai` | `https://open-gateway.anspire.cn/v6`（示例） | `Doubao-Seed-2.0-lite,Doubao-Seed-2.0-pro,qwen3.5-flash,MiniMax-M2.7`（示例） |
 | Ollama | `ollama` | `ollama` | `http://127.0.0.1:11434` | `llama3.2,qwen2.5` |
 
 ## 官方来源与兼容性
 
 | 服务商 | 官方来源 | 兼容说明 |
 | --- | --- | --- |
-| Anspire Open | [Anspire Open](https://open.anspire.cn/?share_code=QFBC0FYC) | `ANSPIRE_API_KEYS` 在未配置更高优先级 OpenAI-compatible 来源时可用于大模型网关与搜索；页面与 `.env` 默认示例为 `openai/Doubao-Seed-2.0-lite` + `https://open-gateway.anspire.cn/v6`，是否可用以控制台与模型权限为准。 |
+| Modelflare | [快速开始](https://docs.modelflare.dev/quickstart/)、[接入端点](https://docs.modelflare.dev/guides/endpoints/)、[模型与分组](https://docs.modelflare.dev/guides/models-and-groups/) | 使用 OpenAI-compatible Base URL `https://modelflare.dev/v1` 和标准 `LLM_MODELFLARE_*` 渠道配置；本项目默认模型为 `gpt-6.1-sol`，模型列表以账号权限与控制台为准。 |
 | OpenAI | [模型列表](https://platform.openai.com/docs/models) | 官方模型页建议从 `gpt-5.5` 开始，低延迟/低成本场景使用 `gpt-5.4-mini` 或 `gpt-5.4-nano`。 |
 | DeepSeek | [快速开始](https://api-docs.deepseek.com/) | 官方 OpenAI Base URL 为 `https://api.deepseek.com`；`deepseek-chat` / `deepseek-reasoner` 将于 2026-07-24 弃用，当前模板直接使用 `deepseek-v4-flash` / `deepseek-v4-pro`。 |
 | Gemini | [模型列表](https://ai.google.dev/gemini-api/docs/models) | Gemini 3.1 Pro / Gemini 3 Flash 仍为 preview；如需生产稳定性，可在控制台改回 2.5 稳定模型。 |
@@ -139,9 +157,11 @@ LITELLM_FALLBACK_MODELS=openai/gpt-5.6-terra,openai/gpt-5.6-luna
 | 火山方舟 / 豆包 | [在线推理（常规）](https://www.volcengine.com/docs/82379/2121998)、[模型列表](https://www.volcengine.com/docs/82379/1949118) | 官方示例使用 `https://ark.cn-beijing.volces.com/api/v3` 与 `doubao-seed-1-6-251015`；如使用 Coding Plan，请改用其专用 Base URL 和模型名，不要套用本表的在线推理模板。 |
 | SiliconFlow | [模型列表](https://docs.siliconflow.cn/quickstart/models)、[获取模型列表 API](https://docs.siliconflow.cn/cn/api-reference/models/get-model-list) | 平台模型实时更新且 `/models` 需要 API Key；模板只给常见新模型示例，保存前建议在 Web 设置页点击「获取模型」确认账号可见性。 |
 | OpenRouter | [Models API](https://openrouter.ai/docs/api/api-reference/models/get-models) | OpenRouter 支持 `~anthropic/claude-sonnet-latest`、`~openai/gpt-latest` 等 latest router alias；2026-05-03 的一次手动 live smoke 以 Claude Sonnet latest 作为默认示例通过，GPT latest 保留为可按账号权限切换的备选。 |
+| Requesty | [Models API](https://docs.requesty.ai/api-reference/endpoint/models-list)、[EU Routing](https://docs.requesty.ai/features/eu-routing) | 模板示例为无斜杠的 managed 模型 ID，运行时按 `openai/<model>` 路由；Base URL 为 `requesty.ai` 域名时，Web「获取模型」返回的 vendor/model ID 会保存为 `openai/<vendor>/<model>`（如 `openai/openai/gpt-4o-mini`、`openai/anthropic/claude-sonnet-4-6`），手动填写的 `anthropic/...`、`vertex/...` 也会自动补上 `openai/` 网关路由，完整 ID 原样发送给 Requesty；仅 `openai/` 开头的 ID 与 LiteLLM 路由前缀重名，手动填写时需写成 `openai/openai/gpt-4o-mini`。同一 API Key 可用于 EU 端点 `https://router.eu.requesty.ai/v1`。 |
+| Anspire Open（兼容） | [Anspire Open](https://open.anspire.cn/dsa?share_code=QFBC0FYC) | `ANSPIRE_API_KEYS` 在未配置更高优先级 OpenAI-compatible 来源时可用于大模型网关与搜索；兼容示例为 `openai/Doubao-Seed-2.0-lite` + `https://open-gateway.anspire.cn/v6`，是否可用以控制台与模型权限为准。 |
 | LiteLLM | [OpenAI-Compatible Endpoints](https://docs.litellm.ai/docs/providers/openai_compatible) | OpenAI-compatible 端点需要把运行时模型写成 `openai/<model>`，Base URL 只填到服务商兼容入口，不额外拼接 `/chat/completions`。 |
 
-本页预设只保证配置形状与当前依赖的 OpenAI-compatible 路由规则一致；实际连通性仍取决于服务商账号权限、地域、额度和模型开通状态。当前 LiteLLM 版本约束为 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（见 `requirements.txt`），保留历史最低版本、显式排除 PyPI 事故版本，并避免未来大版本自动进入。
+本页预设只保证配置形状与当前依赖的 OpenAI-compatible 路由规则一致；实际连通性仍取决于服务商账号权限、地域、额度和模型开通状态。当前 LiteLLM 版本约束为 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<1.99.0`（见 `requirements.txt`），保留历史最低版本、显式排除 PyPI 事故版本，并将上界收敛到已验证的 `<1.99.0`，避免未来大版本自动进入。
 
 ## OpenAI-compatible 与 LiteLLM 规则
 
@@ -155,10 +175,11 @@ LITELLM_FALLBACK_MODELS=openai/gpt-5.6-terra,openai/gpt-5.6-luna
 
 ## GitHub Actions 配置
 
-仓库自带 `.github/workflows/00-daily-analysis.yml` 只会透传 workflow 中显式列出的环境变量。使用渠道模式时，先在 Repository Variables 或 Secrets 中设置 `LLM_CHANNELS`，再按渠道名补齐对应 `LLM_<CHANNEL>_*`。
+仓库自带 `.github/workflows/00-daily-analysis.yml` 只会透传 workflow 中显式列出的环境变量。Modelflare 单 Key 接入只需在 Secrets 中设置 `MODELFLARE_KEY`。使用显式渠道模式时，先在 Repository Variables 或 Secrets 中设置 `LLM_CHANNELS`，再按渠道名补齐对应 `LLM_<CHANNEL>_*`。
 
 | 字段 | 建议位置 | 说明 |
 | --- | --- | --- |
+| `MODELFLARE_KEY` | Secrets | Modelflare 单 Key 接入，自动补齐默认地址与模型。 |
 | `LLM_CHANNELS` | Variables 或 Secrets | 逗号分隔渠道名，例如 `deepseek,minimax,volcengine`。 |
 | `LLM_<CHANNEL>_PROTOCOL` | Variables 或 Secrets | 非敏感，通常为 `openai`、`deepseek`、`gemini`、`anthropic` 或 `ollama`。 |
 | `LLM_<CHANNEL>_API_SURFACE` | Variables 或 Secrets | 可选；`chat_completions`（默认）或 `responses`。Responses 当前只支持 `openai` 协议。 |
@@ -172,7 +193,7 @@ LITELLM_FALLBACK_MODELS=openai/gpt-5.6-terra,openai/gpt-5.6-luna
 | `LLM_USAGE_HMAC_SECRET` | Secrets | 可选；只有需要跨部署比较 usage message HMAC 时才配置同一个高熵随机密钥，例如 `openssl rand -hex 32`；不要放 Variables 或提交到版本控制。 |
 | `LLM_USAGE_HMAC_KEY_VERSION` | Variables 或 Secrets | 可选；轮换 `LLM_USAGE_HMAC_SECRET` 时同步更新版本标签，避免误比较不同密钥生成的 HMAC。 |
 
-默认 workflow 已显式映射 `primary`、`secondary`、`aihubmix`、`anspire`、`deepseek`、`dashscope`、`zhipu`、`moonshot`、`minimax`、`volcengine`、`siliconflow`、`openrouter`、`gemini`、`anthropic`、`openai`、`ollama`、`hermes`；`mimo` 未在默认 workflow 中映射。若使用 `mimo`（或任何未列渠道名），除了在 Variables/Secrets 配置同名 `LLM_<CHANNEL>_*` 外，还需在 workflow 中同步补齐对应 env 映射；本地 `.env`、Docker 和自托管脚本不受这个限制。
+默认 workflow 已显式映射 `modelflare`、`primary`、`secondary`、`aihubmix`、`anspire`、`deepseek`、`dashscope`、`zhipu`、`moonshot`、`minimax`、`volcengine`、`siliconflow`、`openrouter`、`requesty`、`gemini`、`anthropic`、`openai`、`ollama`、`hermes`；`mimo` 未在默认 workflow 中映射。若使用 `mimo`（或任何未列渠道名），除了在 Variables/Secrets 配置同名 `LLM_<CHANNEL>_*` 外，还需在 workflow 中同步补齐对应 env 映射；本地 `.env`、Docker 和自托管脚本不受这个限制。
 
 回滚 HMAC 遥测显式配置时，可移除 `LLM_USAGE_HMAC_SECRET` 并恢复或删除 `LLM_USAGE_HMAC_KEY_VERSION`；留空后系统会回到本地生成 `.llm_usage_hmac_secret` 的默认行为。
 
@@ -226,7 +247,7 @@ Phase 3 只支持普通分析 / JSON generation，不支持 stream/SSE、tools�
 
 - SiliconFlow 官方错误处理文档要求接口错误排查时记录 HTTP 错误码和 `message`，说明 403 表示余额不足或权限不够，其他情况参考报错 `message`，并建议换一个模型确认问题是否仍存在（中文：<https://docs.siliconflow.cn/cn/faqs/error-code>；英文：<https://docs.siliconflow.cn/en/faqs/error-code>）。
 - Issue #1208 中真实脱敏样例来自 SiliconFlow / OpenAI Compatible 渠道测试，经 LiteLLM 返回 `litellm.APIError: APIError: OpenAIException - Model disabled.`。
-- 线上复核记录（2026-05-06T16:21:21Z）：在 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0` 约束下，本地验证环境为 Python `3.13.12`、LiteLLM `1.82.3`、Base URL `https://api.siliconflow.cn/v1`、模型 `Qwen/Qwen3-235B-A22B-Thinking-2507`。直连 SiliconFlow Chat Completions 返回 HTTP `403`，响应体为 `{"code":30003,"message":"Model disabled.","data":null}`；同一模型通过 LiteLLM `completion(model="openai/Qwen/Qwen3-235B-A22B-Thinking-2507")` 返回 `APIError: OpenAIException - Model disabled.`。
+- 线上复核记录（2026-05-06T16:21:21Z）：在 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<1.99.0` 约束下，本地验证环境为 Python `3.13.12`、LiteLLM `1.82.3`、Base URL `https://api.siliconflow.cn/v1`、模型 `Qwen/Qwen3-235B-A22B-Thinking-2507`。直连 SiliconFlow Chat Completions 返回 HTTP `403`，响应体为 `{"code":30003,"message":"Model disabled.","data":null}`；同一模型通过 LiteLLM `completion(model="openai/Qwen/Qwen3-235B-A22B-Thinking-2507")` 返回 `APIError: OpenAIException - Model disabled.`。
 
 因此当前运行时把该已观测 provider `message` 作为 best-effort 模型可用性诊断，而不是把它声明为官方跨 provider 错误码。实现仅在错误文本同时包含 `model` 和明确权限、禁用或不可用信号时进入该诊断；未覆盖或语义不同的 provider 文案会继续走既有兜底诊断。`provider_blocked` 同样是基于明确拦截文案的 best-effort 诊断，用于区分服务商/网关策略拦截与本地网络、TLS 或模型不可用问题。
 
@@ -237,7 +258,7 @@ Phase 3 只支持普通分析 / JSON generation，不支持 stream/SSE、tools�
 - 检测结果只代表当前账号、模型和 endpoint 的一次 best-effort 运行时结果。
 - 检测结果不会写回 `.env`，也不会阻止保存配置。
 - 能力检测失败不等于 provider 全局不支持；失败可能来自账号权限、模型未开通、endpoint 区域、余额、服务商兼容层或 LiteLLM 转换路径。
-- 当前实现未对所有真实 provider 做在线 smoke，兼容依据是 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（见 `requirements.txt`）、[LiteLLM Python SDK / OpenAI I/O format](https://docs.litellm.ai/)、[LiteLLM OpenAI-compatible 路由](https://docs.litellm.ai/docs/providers/openai_compatible)，以及 OpenAI Chat Completions 的 [JSON mode](https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat)、[tool calling](https://platform.openai.com/docs/guides/function-calling?api-mode=chat)、[streaming](https://platform.openai.com/docs/guides/streaming-responses?api-mode=chat) 和 [vision input](https://platform.openai.com/docs/guides/images-vision?api-mode=chat) 请求形状。
+- 当前实现未对所有真实 provider 做在线 smoke，兼容依据是 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<1.99.0`（见 `requirements.txt`）、[LiteLLM Python SDK / OpenAI I/O format](https://docs.litellm.ai/)、[LiteLLM OpenAI-compatible 路由](https://docs.litellm.ai/docs/providers/openai_compatible)，以及 OpenAI Chat Completions 的 [JSON mode](https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat)、[tool calling](https://platform.openai.com/docs/guides/function-calling?api-mode=chat)、[streaming](https://platform.openai.com/docs/guides/streaming-responses?api-mode=chat) 和 [vision input](https://platform.openai.com/docs/guides/images-vision?api-mode=chat) 请求形状。
 
 ## 回滚方式
 

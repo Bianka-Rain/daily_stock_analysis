@@ -41,7 +41,12 @@ from src.config import (
     parse_env_bool,
     parse_env_int,
     resolve_news_window_days,
+    resolve_llm_channel_base_url,
+    resolve_llm_channel_models,
+    resolve_llm_channel_api_keys,
+    resolve_llm_channel_names,
     resolve_llm_channel_protocol,
+    route_discovered_llm_model,
     setup_env,
 )
 from src.llm.hermes import (
@@ -162,6 +167,7 @@ class SystemConfigService:
         "DEEPSEEK_API_KEY",
         "DEEPSEEK_API_KEYS",
         "AIHUBMIX_KEY",
+        "MODELFLARE_KEY",
         "ANSPIRE_LLM_ENABLED",
         "ANSPIRE_LLM_BASE_URL",
         "ANSPIRE_LLM_MODEL",
@@ -315,9 +321,15 @@ class SystemConfigService:
     @staticmethod
     def _reload_runtime_singletons() -> None:
         """Reset runtime singleton services after config reload."""
+        from src.agent.factory import reset_tool_registry
         from src.agent.tools.data_tools import reset_fetcher_manager
         from src.search_service import reset_search_service
 
+        # Drop the module-level ToolRegistry so the next
+        # ``build_agent_executor`` / ``build_agent_chat_executor`` call
+        # rebuilds ``_TOOL_REGISTRY`` against the fresh Config and picks up
+        # new ``AGENT_*_TOOL_TIMEOUT_S`` overrides (Issue #1890).
+        reset_tool_registry()
         reset_fetcher_manager()
         reset_search_service()
 
@@ -402,7 +414,7 @@ class SystemConfigService:
         keys = set(registered_keys)
         channel_names = {
             segment.strip().upper()
-            for segment in config_map.get("LLM_CHANNELS", "").split(",")
+            for segment in resolve_llm_channel_names(config_map).split(",")
             if segment.strip()
         }
         if not channel_names:
@@ -428,8 +440,8 @@ class SystemConfigService:
         channel_names = {
             segment.strip().upper()
             for raw_channels in (
-                saved_config_map.get("LLM_CHANNELS", ""),
-                os.environ.get("LLM_CHANNELS", ""),
+                resolve_llm_channel_names(saved_config_map),
+                resolve_llm_channel_names(os.environ),
             )
             for segment in raw_channels.split(",")
             if segment.strip()
@@ -946,6 +958,7 @@ class SystemConfigService:
     ) -> Dict[str, Any]:
         """Discover available models from an OpenAI-compatible `/models` endpoint."""
         channel_name = name.strip() or "channel"
+        base_url = resolve_llm_channel_base_url(channel_name, base_url)
         resolved_secret, secret_error, redaction_values = self._resolve_hermes_saved_secret(
             channel_name=channel_name,
             protocol=protocol,
@@ -1169,7 +1182,10 @@ class SystemConfigService:
                 redaction_values=redaction_values,
             )
 
-        models = self._extract_discovered_llm_models(payload)
+        models = [
+            route_discovered_llm_model(model_id, base_url)
+            for model_id in self._extract_discovered_llm_models(payload)
+        ]
         if not models:
             return self._build_llm_channel_result(
                 success=False,
@@ -1217,6 +1233,14 @@ class SystemConfigService:
         requested_capabilities = self._normalize_llm_capability_checks(capability_checks)
         raw_models = [str(model).strip() for model in models if str(model).strip()]
         channel_name = name.strip() or "channel"
+        base_url = resolve_llm_channel_base_url(channel_name, base_url)
+        if not raw_models and channel_name.lower() == "modelflare":
+            effective_map = self._build_generation_backend_base_map()
+            raw_models = resolve_llm_channel_models(
+                channel_name, raw_models, channel_names=resolve_llm_channel_names(effective_map),
+                primary_model=effective_map.get("LITELLM_MODEL") or "",
+                fallback_models=effective_map.get("LITELLM_FALLBACK_MODELS") or "",
+            )
         resolved_api_surface = normalize_llm_channel_api_surface(api_surface)
         generation_stage = "responses" if resolved_api_surface == "responses" else "chat_completion"
         resolved_secret, secret_error, redaction_values = self._resolve_hermes_saved_secret(
@@ -2478,7 +2502,7 @@ class SystemConfigService:
             return []
         if SystemConfigService._collect_llm_channel_models_from_map(effective_map):
             return []
-        if (effective_map.get("LLM_CHANNELS") or "").strip():
+        if resolve_llm_channel_names(effective_map):
             return []
 
         issues: List[Dict[str, Any]] = []
@@ -3381,7 +3405,7 @@ class SystemConfigService:
     def _anspire_legacy_llm_enabled(cls, effective_map: Dict[str, str]) -> bool:
         if not parse_env_bool(effective_map.get("ANSPIRE_LLM_ENABLED"), default=True):
             return False
-        for name in cls._split_csv(effective_map.get("LLM_CHANNELS") or ""):
+        for name in cls._split_csv(resolve_llm_channel_names(effective_map)):
             if name.strip().lower() != "anspire":
                 continue
             enabled_raw = effective_map.get("LLM_ANSPIRE_ENABLED")
@@ -3430,7 +3454,7 @@ class SystemConfigService:
     def _collect_setup_channel_models(cls, effective_map: Dict[str, str]) -> List[str]:
         models: List[str] = []
         seen: Set[str] = set()
-        for raw_name in cls._split_csv(effective_map.get("LLM_CHANNELS") or ""):
+        for raw_name in cls._split_csv(resolve_llm_channel_names(effective_map)):
             name = raw_name.strip()
             if not name:
                 continue
@@ -3442,7 +3466,7 @@ class SystemConfigService:
             if not enabled:
                 continue
 
-            base_url = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+            base_url = resolve_llm_channel_base_url(name, effective_map.get(f"{prefix}_BASE_URL"))
             if name.lower() == "anspire" and not base_url:
                 base_url = (
                     effective_map.get("ANSPIRE_LLM_BASE_URL")
@@ -3460,7 +3484,13 @@ class SystemConfigService:
             )
             if name.lower() == "anspire" and not api_key:
                 api_key = (effective_map.get("ANSPIRE_API_KEYS") or "").strip()
+            api_key = ','.join(resolve_llm_channel_api_keys(name, cls._split_csv(api_key), effective_map))
             raw_models = cls._split_csv(effective_map.get(f"{prefix}_MODELS") or "")
+            raw_models = resolve_llm_channel_models(
+                name, raw_models, channel_names=resolve_llm_channel_names(effective_map),
+                primary_model=effective_map.get("LITELLM_MODEL") or "",
+                fallback_models=effective_map.get("LITELLM_FALLBACK_MODELS") or "",
+            )
             if name.lower() == "anspire" and not raw_models:
                 raw_models = [
                     (
@@ -4617,7 +4647,7 @@ class SystemConfigService:
         if SystemConfigService._uses_litellm_yaml(effective_map):
             return issues
 
-        raw_channels = (effective_map.get("LLM_CHANNELS") or "").strip()
+        raw_channels = resolve_llm_channel_names(effective_map)
         if not raw_channels:
             return issues
 
@@ -4664,7 +4694,7 @@ class SystemConfigService:
             api_surface_value = (effective_map.get(f"{prefix}_API_SURFACE") or "").strip()
             if name.lower() == "anspire" and not protocol_value:
                 protocol_value = "openai"
-            base_url_value = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+            base_url_value = resolve_llm_channel_base_url(name, effective_map.get(f"{prefix}_BASE_URL"))
             if name.lower() == "anspire" and not base_url_value:
                 base_url_value = (
                     effective_map.get("ANSPIRE_LLM_BASE_URL")
@@ -4676,11 +4706,19 @@ class SystemConfigService:
             )
             if name.lower() == "anspire" and not api_key_value:
                 api_key_value = (effective_map.get("ANSPIRE_API_KEYS") or "").strip()
+            api_key_value = ','.join(resolve_llm_channel_api_keys(
+                name, SystemConfigService._split_csv(api_key_value), effective_map,
+            ))
             models_value = [
                 model.strip()
                 for model in (effective_map.get(f"{prefix}_MODELS") or "").split(",")
                 if model.strip()
             ]
+            models_value = resolve_llm_channel_models(
+                name, models_value, channel_names=resolve_llm_channel_names(effective_map),
+                primary_model=effective_map.get("LITELLM_MODEL") or "",
+                fallback_models=effective_map.get("LITELLM_FALLBACK_MODELS") or "",
+            )
             if name.lower() == "anspire" and not models_value:
                 models_value = [
                     (
@@ -4795,7 +4833,7 @@ class SystemConfigService:
     @staticmethod
     def _collect_llm_channel_models_from_map(effective_map: Dict[str, str]) -> List[str]:
         """Collect normalized model names from channel-style env values."""
-        raw_channels = (effective_map.get("LLM_CHANNELS") or "").strip()
+        raw_channels = resolve_llm_channel_names(effective_map)
         if not raw_channels:
             return []
 
@@ -4814,7 +4852,7 @@ class SystemConfigService:
             if not enabled:
                 continue
 
-            base_url_value = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+            base_url_value = resolve_llm_channel_base_url(name, effective_map.get(f"{prefix}_BASE_URL"))
             if name.lower() == "anspire" and not base_url_value:
                 base_url_value = (
                     effective_map.get("ANSPIRE_LLM_BASE_URL")
@@ -4829,6 +4867,11 @@ class SystemConfigService:
                 for model in (effective_map.get(f"{prefix}_MODELS") or "").split(",")
                 if model.strip()
             ]
+            raw_models = resolve_llm_channel_models(
+                name, raw_models, channel_names=resolve_llm_channel_names(effective_map),
+                primary_model=effective_map.get("LITELLM_MODEL") or "",
+                fallback_models=effective_map.get("LITELLM_FALLBACK_MODELS") or "",
+            )
             if name.lower() == "anspire" and not raw_models:
                 raw_models = [
                     (
@@ -4880,7 +4923,7 @@ class SystemConfigService:
     @staticmethod
     def _collect_hermes_channel_models_from_map(effective_map: Dict[str, str]) -> List[str]:
         """Collect valid reserved Hermes route aliases from channel-style env values."""
-        raw_channels = (effective_map.get("LLM_CHANNELS") or "").strip()
+        raw_channels = resolve_llm_channel_names(effective_map)
         if not raw_channels:
             return []
 
@@ -4922,7 +4965,7 @@ class SystemConfigService:
     @staticmethod
     def _collect_non_hermes_channel_models_from_map(effective_map: Dict[str, str]) -> List[str]:
         """Collect enabled non-Hermes channel route aliases from channel-style env values."""
-        raw_channels = (effective_map.get("LLM_CHANNELS") or "").strip()
+        raw_channels = resolve_llm_channel_names(effective_map)
         if not raw_channels:
             return []
         models: List[str] = []
@@ -4937,7 +4980,7 @@ class SystemConfigService:
                 enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
             if not parse_env_bool(enabled_raw, default=True):
                 continue
-            base_url_value = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+            base_url_value = resolve_llm_channel_base_url(name, effective_map.get(f"{prefix}_BASE_URL"))
             if name.lower() == "anspire" and not base_url_value:
                 base_url_value = (
                     effective_map.get("ANSPIRE_LLM_BASE_URL")
@@ -4950,6 +4993,11 @@ class SystemConfigService:
             if not is_supported_llm_channel_api_surface_value(api_surface_value):
                 continue
             raw_models = SystemConfigService._split_csv(effective_map.get(f"{prefix}_MODELS") or "")
+            raw_models = resolve_llm_channel_models(
+                name, raw_models, channel_names=resolve_llm_channel_names(effective_map),
+                primary_model=effective_map.get("LITELLM_MODEL") or "",
+                fallback_models=effective_map.get("LITELLM_FALLBACK_MODELS") or "",
+            )
             if name.lower() == "anspire" and not raw_models:
                 raw_models = [
                     (
@@ -5062,7 +5110,7 @@ class SystemConfigService:
         hermes_route_set = set(SystemConfigService._collect_hermes_channel_models_from_map(effective_map))
         mixed_hermes_routes = SystemConfigService._collect_mixed_hermes_routes_from_map(effective_map)
         if not available_model_set:
-            raw_channels = (effective_map.get("LLM_CHANNELS") or "").strip()
+            raw_channels = resolve_llm_channel_names(effective_map)
             if not raw_channels:
                 return issues
 

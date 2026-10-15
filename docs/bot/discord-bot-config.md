@@ -132,7 +132,7 @@ Discord机器人支持以下Slash命令：
 
 - `/help [command]`：查看帮助
 - `/status`：查看系统状态
-- `/analyze <stock_code> [full]`：分析单只股票
+- `/analyze <stock_code> [full]`：分析单只股票、已登记指数（如 `sh000016`、`上证50`）或股票名称（如 `贵州茅台`）
 - `/market`：执行大盘复盘
 - `/batch [count]`：批量分析自选股
 - `/ask <stock_codes> [strategy]`：使用 Agent 技能分析股票
@@ -141,11 +141,13 @@ Discord机器人支持以下Slash命令：
 - `/strategies [active]`：查看可用策略
 - `/history [session]`：查看会话历史，参数也可使用 `clear`
 
+> 边界：`/analyze` 支持已登记指数入口与股票名称输入（股票名称复用既有名称解析器并提交 legacy code）；`/ask` 与 `/batch` 暂不支持指数输入。
+
 ## 测试机器人
 
 1. 确保机器人已成功添加到你的服务器
 2. 在频道中输入`/help`，机器人会返回帮助信息
-3. 输入`/analyze 600519`测试股票分析功能
+3. 输入`/analyze 600519`测试股票分析功能（已登记指数如 `/analyze sh000016`、股票名称如 `/analyze 贵州茅台` 同样可用）
 4. 输入`/market`测试大盘复盘功能
 
 ## 注意事项
