@@ -20,6 +20,7 @@ from src.config import (
 from src.formatters import (
     MIN_MAX_WORDS,
     chunk_content_by_max_words,
+    format_discord_markdown,
     strip_hidden_markdown_metadata,
 )
 
@@ -95,7 +96,7 @@ class DiscordSender:
         Returns:
             是否发送成功
         """
-        sanitized_content = strip_hidden_markdown_metadata(content).strip()
+        sanitized_content = format_discord_markdown(strip_hidden_markdown_metadata(content))
         if not sanitized_content:
             logger.warning("Discord 消息内容为空，跳过推送")
             return False

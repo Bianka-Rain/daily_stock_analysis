@@ -591,6 +591,76 @@ def markdown_tables_to_key_value_rows(content: str, *, bullet: str = "•") -> s
     ).strip()
 
 
+def _flush_table_for_discord(buffer: List[str], output: List[str]) -> None:
+    rows = [
+        _parse_markdown_table_row(raw)
+        for raw in buffer
+        if not _is_markdown_table_separator(raw)
+    ]
+    rows = [row for row in rows if any(cell.strip() for cell in row)]
+    if not rows:
+        return
+    header = [_strip_inline_markdown(cell) for cell in rows[0]]
+    data_rows = rows[1:]
+    if not data_rows:
+        output.append(" · ".join(cell for cell in header if cell))
+        return
+
+    def _present(cell: str) -> bool:
+        return bool(cell) and cell.upper() != "N/A"
+
+    if len(data_rows) == 1:
+        for key, cell in zip(header, data_rows[0]):
+            value = _strip_inline_markdown(cell)
+            if key and _present(value):
+                output.append(f"- **{key}**：{value}")
+        return
+
+    if len(header) == 2:
+        for row in data_rows:
+            key = _strip_inline_markdown(row[0])
+            value = _strip_inline_markdown(row[1]) if len(row) > 1 else ""
+            output.append(f"- **{key}**：{value}" if _present(value) else f"- {key}")
+        return
+
+    for row in data_rows:
+        cells = [_strip_inline_markdown(cell) for cell in row]
+        details = " · ".join(
+            f"{key} {value}"
+            for key, value in zip(header[1:], cells[1:])
+            if key and _present(value)
+        )
+        output.append(f"- **{cells[0]}**：{details}" if details else f"- **{cells[0]}**")
+
+
+def _format_discord_markdown_unprotected(content: str) -> str:
+    lines: List[str] = []
+    table_buffer: List[str] = []
+    for raw_line in content.splitlines():
+        line = raw_line.rstrip()
+        if line.strip().startswith('|'):
+            table_buffer.append(line)
+            continue
+        if table_buffer:
+            _flush_table_for_discord(table_buffer, lines)
+            table_buffer = []
+        lines.append(line)
+    if table_buffer:
+        _flush_table_for_discord(table_buffer, lines)
+    result = "\n".join(lines)
+    result = re.sub(r'^\s*---+\s*$', '────────', result, flags=re.MULTILINE)
+    return result.strip()
+
+
+def format_discord_markdown(content: str) -> str:
+    """Discord does not render pipe tables: turn them into bullet lines Discord can display."""
+
+    return _transform_outside_fenced_code_blocks(
+        content,
+        _format_discord_markdown_unprotected,
+    ).strip()
+
+
 def _chunk_by_max_bytes(content: str, max_bytes: int) -> List[str]:
     if _bytes(content) <= max_bytes:
         return [content]

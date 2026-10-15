@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [新功能] Discord 新增 `/订阅更新公告`、`/取消订阅更新公告`（需管理频道/服务器权限）；`DISCORD_UPDATE_ANNOUNCE_ENABLED=true` 时服务启动会把 `bot/announcements/` 最新公告以 embed 推送到订阅频道，每个频道每份公告只发一次，并新增 `scripts/check_update_announcement.py` 与 `bot-update-announcement` skill 约束公告取材、连续性与模板。
 - [新功能] 新增 `DISCORD_COMMAND_SYNC_ENABLED`：服务启动时用 `DISCORD_BOT_TOKEN` 自动注册全局 Slash 命令并清理服务器级副本，命令定义收敛到 `bot/discord_commands.py`，部署后无需手动注册。
 - [修复] `scripts/register_discord_commands.py` 新增 `--clear-guild-commands`，清除机器人所在服务器的 Guild 级命令副本，解决 Guild 与全局同时注册导致的 Slash 命令重复。
+- [修复] Discord 不渲染 Markdown 表格：推送前把表格转成逐项列表（单行表按列展开、多行表每行一条、省略 N/A），分隔线改为 `────────`，每日推送、大盘复盘与 `/analyze` 结果均生效。
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
