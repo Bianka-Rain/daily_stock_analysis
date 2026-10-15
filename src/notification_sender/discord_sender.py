@@ -225,6 +225,48 @@ class DiscordSender:
             channel_name="Bot",
         )
 
+    def send_to_channel(
+        self,
+        channel_id: str,
+        content: str = "",
+        *,
+        embed: Optional[dict] = None,
+        timeout_seconds: Optional[float] = None,
+    ) -> bool:
+        """Send text or one embed to an explicit channel via the Bot API, without pinging anyone."""
+        if not self._discord_config['bot_token'] or not channel_id:
+            logger.warning("Discord Bot Token 或频道 ID 未配置，无法发送到指定频道")
+            return False
+        headers = {
+            'Authorization': f'Bot {self._discord_config["bot_token"]}',
+            'Content-Type': 'application/json'
+        }
+        url = f'https://discord.com/api/v10/channels/{channel_id}/messages'
+
+        def send_once(chunk: str, *, timeout_seconds: Optional[float] = None) -> bool:
+            payload = {'allowed_mentions': {'parse': []}}
+            if chunk:
+                payload['content'] = chunk
+            if embed is not None:
+                payload['embeds'] = [embed]
+            return self._post_discord_message(
+                url,
+                payload,
+                headers=headers,
+                success_statuses=(200,),
+                timeout_seconds=timeout_seconds,
+                channel_name="Bot",
+            )
+
+        if embed is not None:
+            return send_once(content, timeout_seconds=timeout_seconds)
+        return self._send_discord_chunks(
+            self._split_discord_content(content),
+            send_once,
+            "Bot",
+            timeout_seconds=timeout_seconds,
+        )
+
     def _post_discord_message(
         self,
         url: str,

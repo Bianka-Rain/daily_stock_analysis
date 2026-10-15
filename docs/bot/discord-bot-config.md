@@ -140,8 +140,21 @@ Discord机器人支持以下Slash命令：
 - `/research <topic> [question]`：深度研究股票或市场主题
 - `/strategies [active]`：查看可用策略
 - `/history [session]`：查看会话历史，参数也可使用 `clear`
+- `/订阅更新公告`：在当前频道订阅机器人更新公告（需「管理频道」或「管理服务器」权限，或在 `BOT_ADMIN_USERS` 中）
+- `/取消订阅更新公告`：取消当前频道的更新公告订阅
 
 > 边界：`/analyze` 支持已登记指数入口与股票名称输入（股票名称复用既有名称解析器并提交 legacy code）；`/ask` 与 `/batch` 暂不支持指数输入。
+
+## 更新公告订阅
+
+在想接收更新公告的频道里执行 `/订阅更新公告`。服务端开启 `DISCORD_UPDATE_ANNOUNCE_ENABLED=true` 后：
+
+- 每次部署后服务启动时，把 `bot/announcements/` 中编号最大的公告以 embed 发到所有订阅频道；
+- 每个（公告, 频道）先在数据库 `bot_update_deliveries` 登记再发送，重启、只改 secrets、重复部署同一版本都不会重发；
+- 新订阅的频道从下一份公告开始接收；发送失败只记日志，不在下次重启时补发；
+- 需要 `DISCORD_BOT_TOKEN`，机器人在该频道需有发送消息与嵌入链接权限。
+
+公告由 `bot-update-announcement` skill（`.claude/skills/bot-update-announcement/SKILL.md`）撰写：先 `python scripts/check_update_announcement.py prepare` 获取下一份编号、base 和净 diff，按模板写 `bot/announcements/NNNN.md`，部署前必须通过 `python scripts/check_update_announcement.py check --require-current`。
 
 ## 测试机器人
 

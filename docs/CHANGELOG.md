@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] GitHub Actions 每日分析改为纽约时间工作日 16:30 运行，即纳斯达克常规交易收盘后 30 分钟，并自动适配美国夏令时。
 - [新功能] 新增经 Ed25519 验签的 Discord Interaction 公网入口与 Slash 命令注册脚本，支持 Guild/Global 注册、安全 dry-run、非回显 Token 输入及敏感载荷日志脱敏。
 - [修复] Discord HTTP Interaction 在 type=5 ACK 响应体发送完成后才启动命令派发与 follow-up，避免快速命令抢先编辑尚未建立的原始响应。
+- [改进] `ANTHROPIC_MODEL` 默认值改为 `claude-sonnet-5-5`；Claude Sonnet/Opus/Haiku 5.x、Opus 4.7/4.8 等只接受默认采样参数的模型在请求时自动省略 `temperature`，避免 400 后再重试。
+- [新功能] Discord 新增 `/订阅更新公告`、`/取消订阅更新公告`（需管理频道/服务器权限）；`DISCORD_UPDATE_ANNOUNCE_ENABLED=true` 时服务启动会把 `bot/announcements/` 最新公告以 embed 推送到订阅频道，每个频道每份公告只发一次，并新增 `scripts/check_update_announcement.py` 与 `bot-update-announcement` skill 约束公告取材、连续性与模板。
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->

@@ -222,6 +222,28 @@ def _schedule_stock_index_background_refresh(app: FastAPI, reason: str) -> None:
     )
 
 
+async def _announce_bot_update_in_background() -> None:
+    try:
+        from src.config import get_config
+        from src.services.bot_update_announcement_service import announce_latest
+
+        await run_in_threadpool(announce_latest, get_config())
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - announcements must stay best-effort.
+        logger.warning("[更新公告] 后台推送失败: %s", exc)
+
+
+def _schedule_bot_update_announcement(app: FastAPI) -> None:
+    from src.config import get_config
+
+    if not getattr(get_config(), "discord_update_announce_enabled", False):
+        return
+    app.state.bot_update_announce_task = asyncio.create_task(
+        _announce_bot_update_in_background()
+    )
+
+
 def _load_runtime_scheduler_args() -> dict:
     raw_value = os.getenv(RUNTIME_SCHEDULER_ARGS_ENV)
     if not raw_value:
@@ -297,14 +319,16 @@ async def app_lifespan(app: FastAPI):
     from src.services.name_to_code_resolver import warmup_akshare_cache
 
     warmup_akshare_cache()
+    _schedule_bot_update_announcement(app)
     try:
         yield
     finally:
-        refresh_task = getattr(app.state, "stock_index_refresh_task", None)
-        if refresh_task is not None and not refresh_task.done():
-            refresh_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await refresh_task
+        for task_name in ("stock_index_refresh_task", "bot_update_announce_task"):
+            task = getattr(app.state, task_name, None)
+            if task is not None and not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
         if hasattr(app.state, "system_config_service"):
             delattr(app.state, "system_config_service")
         runtime_scheduler = getattr(app.state, "runtime_scheduler_service", None)

@@ -77,6 +77,8 @@ COMMAND_PAYLOADS = [
         "description": "查看 Agent 对话历史",
         "options": [_option("session", "会话 ID，或输入 clear 清空")],
     },
+    {"name": "订阅更新公告", "description": "在当前频道订阅机器人更新公告"},
+    {"name": "取消订阅更新公告", "description": "取消当前频道的机器人更新公告订阅"},
 ]
 
 

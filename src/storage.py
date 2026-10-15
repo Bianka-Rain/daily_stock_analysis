@@ -1050,6 +1050,45 @@ class AlertCooldownRecord(Base):
     )
 
 
+class BotUpdateSubscriptionRecord(Base):
+    """Chat channel subscribed to bot update announcements."""
+
+    __tablename__ = 'bot_update_subscriptions'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    platform = Column(String(32), nullable=False, index=True)
+    channel_id = Column(String(64), nullable=False)
+    guild_id = Column(String(64))
+    subscribed_by = Column(String(64))
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('platform', 'channel_id', name='uix_bot_update_subscription_channel'),
+    )
+
+
+class BotUpdateDeliveryRecord(Base):
+    """One row per (announcement, channel): claimed before sending so each update posts once."""
+
+    __tablename__ = 'bot_update_deliveries'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    announcement_id = Column(String(64), nullable=False, index=True)
+    platform = Column(String(32), nullable=False)
+    channel_id = Column(String(64), nullable=False)
+    # sending / sent / failed / skipped_on_subscribe
+    status = Column(String(32), nullable=False)
+    detail = Column(Text)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            'announcement_id', 'platform', 'channel_id',
+            name='uix_bot_update_delivery_announcement_channel',
+        ),
+    )
+
+
 class DecisionSignalRecord(Base):
     """Persisted AI decision signal asset for Issue #1390 P1."""
 

@@ -20,6 +20,8 @@ EXPECTED_COMMANDS = {
     "research",
     "strategies",
     "history",
+    "订阅更新公告",
+    "取消订阅更新公告",
 }
 
 
