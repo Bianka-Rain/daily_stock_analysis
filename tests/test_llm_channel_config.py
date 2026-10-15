@@ -1633,6 +1633,33 @@ class LLMChannelConfigTestCase(unittest.TestCase):
             0.6,
         )
 
+    def test_claude_default_sampling_only_models_omit_temperature(self) -> None:
+        for model in (
+            "anthropic/claude-sonnet-5-5",
+            "anthropic/claude-sonnet-5",
+            "anthropic/claude-opus-5-5",
+            "anthropic/claude-opus-4-8",
+            "anthropic/claude-opus-4-7",
+            "anthropic/claude-haiku-5-5",
+            "anthropic/claude-fable-5-1",
+            "openai/anthropic/claude-sonnet-5-5",
+        ):
+            with self.subTest(model=model):
+                self.assertTrue(resolve_litellm_temperature_directive(model).omit_temperature)
+                call_kwargs = apply_litellm_generation_params(
+                    {"model": model, "messages": []}, model, 0.2
+                )
+                self.assertNotIn("temperature", call_kwargs)
+
+        for model in (
+            "anthropic/claude-sonnet-4-6",
+            "anthropic/claude-opus-4-6",
+            "anthropic/claude-haiku-4-5",
+            "anthropic/claude-3-5-sonnet-20241022",
+        ):
+            with self.subTest(model=model):
+                self.assertFalse(resolve_litellm_temperature_directive(model).omit_temperature)
+
     def test_gpt5_family_temperature_is_omitted_at_request_build_time(self) -> None:
         directive = resolve_litellm_temperature_directive("openai/gpt5.5-ferr")
         self.assertTrue(directive.omit_temperature)
