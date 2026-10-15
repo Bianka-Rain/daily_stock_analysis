@@ -2447,6 +2447,20 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "validation": {},
         "display_order": 36,
     },
+    "DISCORD_COMMAND_SYNC_ENABLED": {
+        "title": "Discord Slash Command Sync",
+        "description": "On server startup, re-register global Discord slash commands with DISCORD_BOT_TOKEN and remove guild-scoped duplicates.",
+        "category": "notification",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 36,
+    },
     "DISCORD_UPDATE_ANNOUNCE_ENABLED": {
         "title": "Discord Update Announcements",
         "description": "Post the newest bot update announcement once to subscribed Discord channels when the server starts (/订阅更新公告).",
@@ -5048,6 +5062,14 @@ _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]] = {
         "help_key": "settings.notification.chat_bots",
         "examples": [
             "DISCORD_INTERACTIONS_PUBLIC_KEY=your_discord_public_key",
+        ],
+        "docs": _DOC_FULL_GUIDE_NOTIFICATION,
+        "warning_codes": [],
+    },
+    "DISCORD_COMMAND_SYNC_ENABLED": {
+        "help_key": "settings.notification.chat_bots",
+        "examples": [
+            "DISCORD_COMMAND_SYNC_ENABLED=true",
         ],
         "docs": _DOC_FULL_GUIDE_NOTIFICATION,
         "warning_codes": [],

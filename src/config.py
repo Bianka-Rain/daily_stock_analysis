@@ -1208,6 +1208,7 @@ class Config:
     discord_webhook_avatar_url: str = DEFAULT_DISCORD_WEBHOOK_AVATAR_URL
     discord_interactions_public_key: Optional[str] = None  # Discord Interaction 入站验签公钥
     discord_update_announce_enabled: bool = False  # 服务启动时向已订阅频道推送最新更新公告
+    discord_command_sync_enabled: bool = False  # 服务启动时同步全局 Slash 命令并清理服务器级副本
 
     # Slack 通知配置
     slack_webhook_url: Optional[str] = None  # Slack Incoming Webhook URL
@@ -2197,6 +2198,9 @@ class Config:
             discord_interactions_public_key=os.getenv('DISCORD_INTERACTIONS_PUBLIC_KEY'),
             discord_update_announce_enabled=(
                 os.getenv('DISCORD_UPDATE_ANNOUNCE_ENABLED', 'false').strip().lower() == 'true'
+            ),
+            discord_command_sync_enabled=(
+                os.getenv('DISCORD_COMMAND_SYNC_ENABLED', 'false').strip().lower() == 'true'
             ),
             slack_webhook_url=os.getenv('SLACK_WEBHOOK_URL'),
             slack_bot_token=os.getenv('SLACK_BOT_TOKEN'),

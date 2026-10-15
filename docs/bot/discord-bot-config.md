@@ -83,6 +83,8 @@ Slash 命令会先收到 Discord 要求的延迟确认，分析结果完成后�
 
 ## 注册 Slash 命令
 
+长期运行的服务可设置 `DISCORD_COMMAND_SYNC_ENABLED=true`：每次启动会用 `DISCORD_BOT_TOKEN` 覆盖注册全局命令，并清掉各服务器的命令副本，部署后不需要再手动运行下面的脚本。
+
 先在一个测试服务器注册，通常更适合首次验证：
 
 ```powershell

@@ -8,78 +8,14 @@ import getpass
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Sequence
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-DISCORD_API_BASE = "https://discord.com/api/v10"
-
-
-def _option(name: str, description: str, *, required: bool = False, kind: int = 3):
-    return {
-        "type": kind,
-        "name": name,
-        "description": description,
-        "required": required,
-    }
-
-
-COMMAND_PAYLOADS = [
-    {
-        "name": "help",
-        "description": "显示帮助信息",
-        "options": [_option("command", "要查看的命令名")],
-    },
-    {"name": "status", "description": "显示系统状态"},
-    {
-        "name": "analyze",
-        "description": "分析指定股票",
-        "options": [
-            _option("stock_code", "股票代码", required=True),
-            _option("full", "生成完整分析", kind=5),
-        ],
-    },
-    {"name": "market", "description": "执行大盘复盘分析"},
-    {
-        "name": "batch",
-        "description": "批量分析自选股",
-        "options": [_option("count", "最多分析的股票数量", kind=4)],
-    },
-    {
-        "name": "ask",
-        "description": "使用 Agent 技能分析股票",
-        "options": [
-            _option("stock_codes", "股票代码，多个代码用逗号分隔", required=True),
-            _option("strategy", "可选的技能或策略名称"),
-        ],
-    },
-    {
-        "name": "chat",
-        "description": "与 AI 助手自由对话",
-        "options": [_option("question", "要询问的问题", required=True)],
-    },
-    {
-        "name": "research",
-        "description": "深度研究股票或市场主题",
-        "options": [
-            _option("topic", "股票代码或研究主题", required=True),
-            _option("question", "可选的具体问题"),
-        ],
-    },
-    {
-        "name": "strategies",
-        "description": "查看可用交易策略",
-        "options": [_option("active", "仅显示已激活策略", kind=5)],
-    },
-    {
-        "name": "history",
-        "description": "查看 Agent 对话历史",
-        "options": [_option("session", "会话 ID，或输入 clear 清空")],
-    },
-    {"name": "订阅更新公告", "description": "在当前频道订阅机器人更新公告"},
-    {"name": "取消订阅更新公告", "description": "取消当前频道的机器人更新公告订阅"},
-]
+from bot.discord_commands import COMMAND_PAYLOADS, DISCORD_API_BASE  # noqa: E402
 
 
 def _parser() -> argparse.ArgumentParser:

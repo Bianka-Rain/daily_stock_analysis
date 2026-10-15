@@ -234,6 +234,30 @@ async def _announce_bot_update_in_background() -> None:
         logger.warning("[更新公告] 后台推送失败: %s", exc)
 
 
+async def _sync_discord_commands_in_background() -> None:
+    try:
+        from bot.discord_commands import sync_discord_commands
+        from src.config import get_config
+
+        summary = await run_in_threadpool(sync_discord_commands, get_config().discord_bot_token)
+        logger.info("[Discord] Slash 命令同步完成: %s", summary)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - command sync must stay best-effort.
+        logger.warning("[Discord] Slash 命令同步失败: %s", exc)
+
+
+def _schedule_discord_command_sync(app: FastAPI) -> None:
+    from src.config import get_config
+
+    config = get_config()
+    if not getattr(config, "discord_command_sync_enabled", False) or not config.discord_bot_token:
+        return
+    app.state.discord_command_sync_task = asyncio.create_task(
+        _sync_discord_commands_in_background()
+    )
+
+
 def _schedule_bot_update_announcement(app: FastAPI) -> None:
     from src.config import get_config
 
@@ -319,11 +343,16 @@ async def app_lifespan(app: FastAPI):
     from src.services.name_to_code_resolver import warmup_akshare_cache
 
     warmup_akshare_cache()
+    _schedule_discord_command_sync(app)
     _schedule_bot_update_announcement(app)
     try:
         yield
     finally:
-        for task_name in ("stock_index_refresh_task", "bot_update_announce_task"):
+        for task_name in (
+            "stock_index_refresh_task",
+            "discord_command_sync_task",
+            "bot_update_announce_task",
+        ):
             task = getattr(app.state, task_name, None)
             if task is not None and not task.done():
                 task.cancel()
