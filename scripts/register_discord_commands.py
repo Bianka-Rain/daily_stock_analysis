@@ -95,6 +95,14 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Register commands globally",
     )
+    scope.add_argument(
+        "--clear-guild-commands",
+        action="store_true",
+        help=(
+            "Remove guild-scoped copies of the commands in every guild the bot "
+            "is in (keeps global commands); fixes duplicated slash commands"
+        ),
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -123,6 +131,52 @@ def _load_bot_token() -> str:
     return ""
 
 
+def _discord_request(method: str, url: str, bot_token: str, payload=None):
+    data = None
+    if payload is not None:
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request = urllib_request.Request(
+        url,
+        data=data,
+        headers={
+            "Authorization": f"Bot {bot_token}",
+            "Content-Type": "application/json",
+            "User-Agent": "daily-stock-analysis-discord-command-register/1.0",
+        },
+        method=method,
+    )
+    response = urllib_request.urlopen(request, timeout=20)
+    try:
+        return json.loads(response.read().decode("utf-8") or "null")
+    finally:
+        response.close()
+
+
+def _clear_guild_commands(application_id: str, bot_token: str) -> int:
+    try:
+        guilds = _discord_request("GET", f"{DISCORD_API_BASE}/users/@me/guilds", bot_token)
+    except (urllib_error.HTTPError, urllib_error.URLError, TimeoutError, ValueError) as exc:
+        status = getattr(exc, "code", None)
+        detail = f" (HTTP {status})" if status is not None else ""
+        print(f"Listing bot guilds failed{detail}", file=sys.stderr)
+        return 1
+
+    failed = 0
+    for guild in guilds or []:
+        guild_id = str(guild.get("id") or "")
+        if not guild_id:
+            continue
+        try:
+            _discord_request("PUT", _endpoint(application_id, guild_id), bot_token, [])
+            print(f"Cleared guild commands in {guild_id}.")
+        except (urllib_error.HTTPError, urllib_error.URLError, TimeoutError, ValueError) as exc:
+            status = getattr(exc, "code", None)
+            detail = f" (HTTP {status})" if status is not None else ""
+            print(f"Clearing guild {guild_id} failed{detail}", file=sys.stderr)
+            failed += 1
+    return 1 if failed else 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     if any(
@@ -139,7 +193,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(raw_argv)
 
     if args.dry_run:
-        print(json.dumps(COMMAND_PAYLOADS, ensure_ascii=False, indent=2))
+        print(json.dumps([] if args.clear_guild_commands else COMMAND_PAYLOADS, ensure_ascii=False, indent=2))
         return 0
 
     bot_token = _load_bot_token()
@@ -149,6 +203,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
+
+    if args.clear_guild_commands:
+        return _clear_guild_commands(args.application_id, bot_token)
 
     endpoint = _endpoint(args.application_id, args.guild_id)
     request = urllib_request.Request(

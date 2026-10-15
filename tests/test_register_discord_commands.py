@@ -124,3 +124,30 @@ def test_legacy_equals_token_argument_is_rejected_without_echoing_secret():
     assert "REVIEW_FAKE_EQUALS_SECRET" not in rendered
     assert "--bot-token" not in rendered
     assert "DISCORD_BOT_TOKEN" in result.stderr
+
+
+def test_clear_guild_commands_empties_every_bot_guild(capsys):
+    def fake_urlopen(request, timeout):
+        response = Mock()
+        if request.get_method() == "GET":
+            response.read.return_value = b'[{"id":"g1"},{"id":"g2"}]'
+        else:
+            response.read.return_value = b"[]"
+        return response
+
+    with patch.dict(os.environ, {"DISCORD_BOT_TOKEN": "secret-token"}), patch(
+        "scripts.register_discord_commands.urllib_request.urlopen", side_effect=fake_urlopen
+    ) as urlopen:
+        exit_code = register_discord_commands.main(
+            ["--application-id", "app-123", "--clear-guild-commands"]
+        )
+
+    assert exit_code == 0
+    requests = [call.args[0] for call in urlopen.call_args_list]
+    assert requests[0].full_url.endswith("/users/@me/guilds")
+    puts = [r for r in requests if r.get_method() == "PUT"]
+    assert [r.full_url.rsplit("/guilds/", 1)[1] for r in puts] == ["g1/commands", "g2/commands"]
+    assert all(json.loads(r.data.decode("utf-8")) == [] for r in puts)
+    assert not any("/applications/app-123/commands" in r.full_url for r in requests)
+    output = capsys.readouterr()
+    assert "secret-token" not in output.out + output.err

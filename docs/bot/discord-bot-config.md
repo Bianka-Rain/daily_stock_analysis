@@ -177,6 +177,7 @@ Discord机器人支持以下Slash命令：
 ## 故障排除
 
 - **机器人不响应命令**：检查Bot Token和频道ID是否正确，确保机器人已添加到服务器
+- **Slash 命令重复出现两次**：同一命令同时注册在服务器（Guild）和全局时会各显示一份。保留全局命令、清掉所有服务器级副本：`python scripts/register_discord_commands.py --application-id <ID> --clear-guild-commands`
 - **Slash命令不显示**：先使用 `--guild-id` 注册并确认应用已通过 `applications.commands` scope 加入服务器；全局命令同步可能需要等待
 - **消息发送失败**：检查频道权限，确保机器人有发送消息的权限
 
